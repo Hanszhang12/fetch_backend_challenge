@@ -1,27 +1,41 @@
 from flask import Flask, jsonify, request
+from jsonschema import validate, ValidationError
+
 import uuid 
 
 app = Flask(__name__)
 
 receipts_data = {}
 
-def is_valid_receipt(json_data):
-    expected_format = {
-        "retailer": str,
-        "purchaseDate": str,
-        "purchaseTime": str,
-        "total": str,
-        "items": list
+item_schema = {
+    "type": "object",
+    "required": ["shortDescription", "price"],
+    "properties": {
+        "shortDescription": {"type": "string", "pattern": "^[\\w\\s\\-]+$"},
+        "price": {"type": "string", "pattern": "^\\d+\\.\\d{2}$"}
     }
+}
 
-    if all(key in json_data for key in expected_format):
-        if all(isinstance(json_data[key], expected_format[key]) for key in expected_format):
-            if "items" in json_data and all(
-                    isinstance(item, dict) and "shortDescription" in item and "price" in item
-                    for item in json_data["items"]
-            ):
-                return True
-    return False
+# Define the schema for the Receipt
+receipt_schema = {
+    "type": "object",
+    "required": ["retailer", "purchaseDate", "purchaseTime", "items", "total"],
+    "properties": {
+        "retailer": {"type": "string", "pattern": "^\\S+$"},
+        "purchaseDate": {"type": "string", "format": "date"},
+        "purchaseTime": {"type": "string", "format": "time"},
+        "items": {"type": "array", "minItems": 1, "items": item_schema},
+        "total": {"type": "string", "pattern": "^\\d+\\.\\d{2}$"}
+    }
+}
+
+def is_valid_receipt(json_data):
+    # Validate the JSON data against the receipt schema
+    try:
+        validate(json_data, receipt_schema)
+        return True
+    except ValidationError:
+        return False
 
 @app.route('/receipts/process', methods=['POST'])
 def process_receipt():
@@ -44,10 +58,12 @@ def process_receipt():
         return jsonify({"description": "The receipt is invalid"}), 400
 
 
-@app.route('/receipts/<int:id>/points')
+@app.route('/receipts/<string:id>/points', methods=['GET'])
 def get_receipt_points(id):
-    # Logic to retrieve points for a specific receipt id
-    return jsonify({"receipt_id": id, "points": 100})  # Replace with actual logic
+    if id not in receipts_data.keys():
+        return jsonify({"description": "No receipt found for that id"}), 404
+
+    return jsonify({"receipt_id": id, "points": 100})  
 
 if __name__ == '__main__':
     app.run(debug=True)
