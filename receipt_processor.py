@@ -1,7 +1,8 @@
 from flask import Flask, jsonify, request
 from jsonschema import validate, ValidationError
-
+import math
 import uuid 
+from datetime import datetime
 
 app = Flask(__name__)
 
@@ -16,7 +17,6 @@ item_schema = {
     }
 }
 
-# Define the schema for the Receipt
 receipt_schema = {
     "type": "object",
     "required": ["retailer", "purchaseDate", "purchaseTime", "items", "total"],
@@ -30,7 +30,6 @@ receipt_schema = {
 }
 
 def is_valid_receipt(json_data):
-    # Validate the JSON data against the receipt schema
     try:
         validate(json_data, receipt_schema)
         return True
@@ -39,10 +38,7 @@ def is_valid_receipt(json_data):
 
 @app.route('/receipts/process', methods=['POST'])
 def process_receipt():
-    # check if receipt is valid 
-    # if it is, we return status code 200
-    # else, we return status code 400
-
+    
     receipt_json = request.json
 
     if is_valid_receipt(receipt_json):
@@ -58,12 +54,62 @@ def process_receipt():
         return jsonify({"description": "The receipt is invalid"}), 400
 
 
+def calculate_score(receipt):
+    total_score = 0
+
+    retailer_name = receipt["retailer"]
+    #check number of alphanumeric characters
+    for char in retailer_name:
+        if char.isalnum():
+            total_score += 1
+
+    #check if total is round dollar amount with no cents
+    receipt_total = receipt["total"]
+    if float(receipt_total) % 1 == 0:
+        total_score += 50
+
+    #check if total is multiple of 0.25
+    if float(receipt_total) % 0.25 == 0:
+        total_score += 25
+
+    #5 points for every two items
+    num_items = len(receipt["items"])
+    total_score += (num_items // 2) * 5
+
+    #check if length of item description is multiple of 3
+    for item in receipt["items"]:
+        description = item["shortDescription"]
+        price = item["price"]
+
+        if len(description.strip()) % 3 == 0:
+            rounded_price = math.ceil(float(price) * 0.2)
+            print(description, rounded_price)
+
+            total_score += rounded_price 
+
+    #check if purchase date is odd
+    purchase_date = datetime.strptime(receipt["purchaseDate"], "%Y-%m-%d")
+    if purchase_date.day % 2 == 1:
+        total_score += 6
+
+    #check if time of purchase is after 2 pm and before 4 pm
+    purchase_time = datetime.strptime(receipt["purchaseTime"], "%H:%M")
+    start_time = datetime.strptime("14:00", "%H:%M")
+    end_time = datetime.strptime("16:00", "%H:%M")
+
+    if purchase_time > start_time and purchase_time < end_time:
+        total_score += 10
+
+    return total_score
+
 @app.route('/receipts/<string:id>/points', methods=['GET'])
 def get_receipt_points(id):
     if id not in receipts_data.keys():
         return jsonify({"description": "No receipt found for that id"}), 404
 
-    return jsonify({"receipt_id": id, "points": 100})  
+    receipt = receipts_data[id]
+    points = calculate_score(receipt)
+    return jsonify({"points": points}), 200 
 
 if __name__ == '__main__':
     app.run(debug=True)
