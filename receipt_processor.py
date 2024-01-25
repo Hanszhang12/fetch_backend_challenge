@@ -83,8 +83,6 @@ def calculate_score(receipt):
 
         if len(description.strip()) % 3 == 0:
             rounded_price = math.ceil(float(price) * 0.2)
-            print(description, rounded_price)
-
             total_score += rounded_price 
 
     #check if purchase date is odd
