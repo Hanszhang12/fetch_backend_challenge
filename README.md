@@ -1,3 +1,24 @@
+# Setup Guide 
+
+1. Clone the repository to your computer
+2. Navigate to the project directory in your terminal
+3. Run the following commands: 
+```
+docker build -t my_receipt_processor .
+docker run -p 5000:5000 my_receipt_processor
+```
+The container should be accessible through http://localhost:5000.
+
+IMPORTANT: 
+While testing, I mainly followed api.yml to make sure that the receipt json was valid. Inside of the api.yml file under retailer pattern, I noticed that pattern : "\\S+$" doesn't allow for spaces. 
+
+Because of this, when I was testing the provided example with retailer name "retailer": "M&M Corner Market", it was giving me a 400 error code. 
+
+Currently, my application assumes that "retailer" names cannot contain spaces. If you use "M&MCornerMarket" for the retailer name, it will still give the correct score. 
+
+
+
+
 # Receipt Processor
 
 Build a webservice that fulfils the documented API. The API is described below. A formal definition is provided 
